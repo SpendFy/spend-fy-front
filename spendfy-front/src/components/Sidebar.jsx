@@ -4,6 +4,8 @@ import {
   LayoutDashboard,
   ArrowUpRight,
   Tags,
+  Wallet,
+  PiggyBank,
   LogOut,
   User as UserIcon,
 } from 'lucide-react';
@@ -22,9 +24,8 @@ export default function Sidebar() {
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { path: '/transacoes', name: 'Transações', icon: ArrowUpRight },
     { path: '/categorias', name: 'Categorias', icon: Tags },
-    // Futuros:
-    // { path: '/contas', name: 'Contas', icon: Wallet },
-    // { path: '/orcamentos', name: 'Orçamentos', icon: PiggyBank },
+    { path: '/contas', name: 'Contas', icon: Wallet },
+    { path: '/orcamentos', name: 'Orçamentos', icon: PiggyBank },
   ];
 
   // Verifica se a rota ativa é a rota exata OU uma sub-rota

@@ -6,6 +6,8 @@ import Dashboard from '../pages/Dashboard';
 import Transacoes from '../pages/Transacoes';
 import TransactionForm from '../pages/TransactionForm';
 import Categorias from '../pages/Categorias';
+import Contas from '../pages/Contas';
+import Orcamentos from '../pages/Orcamentos';
 import PrivateRoute from './PrivateRoute';
 import Layout from '../components/Layout';
 
@@ -24,7 +26,8 @@ export default function AppRoutes() {
           <Route path="/transacoes/nova" element={<TransactionForm />} />
           <Route path="/transacoes/editar/:id" element={<TransactionForm />} />
           <Route path="/categorias" element={<Categorias />} />
-          {/* Adicione novas rotas privadas aqui */}
+          <Route path="/contas" element={<Contas />} />
+          <Route path="/orcamentos" element={<Orcamentos />} />
         </Route>
       </Route>
 

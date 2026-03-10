@@ -83,6 +83,14 @@ export default function TransactionForm() {
       setError('A data é obrigatória.');
       return;
     }
+    if (!formData.idConta) {
+      setError('Selecione uma conta.');
+      return;
+    }
+    if (!formData.idCategoria) {
+      setError('Selecione uma categoria.');
+      return;
+    }
 
     setLoading(true);
 
