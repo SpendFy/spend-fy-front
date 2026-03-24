@@ -8,6 +8,7 @@ import TransactionForm from '../pages/TransactionForm';
 import Categorias from '../pages/Categorias';
 import Contas from '../pages/Contas';
 import Orcamentos from '../pages/Orcamentos';
+import Insights from '../pages/Insights';
 import PrivateRoute from './PrivateRoute';
 import Layout from '../components/Layout';
 
@@ -28,6 +29,7 @@ export default function AppRoutes() {
           <Route path="/categorias" element={<Categorias />} />
           <Route path="/contas" element={<Contas />} />
           <Route path="/orcamentos" element={<Orcamentos />} />
+          <Route path="/insights" element={<Insights />} />
         </Route>
       </Route>
 

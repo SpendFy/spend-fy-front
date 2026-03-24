@@ -1,12 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/axios';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
+
+const RECORRENCIA_OPTIONS = [
+  { value: 'NENHUMA', label: 'Não se repete' },
+  { value: 'DIARIA', label: 'Diária' },
+  { value: 'SEMANAL', label: 'Semanal' },
+  { value: 'MENSAL', label: 'Mensal' },
+  { value: 'ANUAL', label: 'Anual' },
+];
 
 export default function TransactionForm() {
-  const { id } = useParams(); // se existir, estamos editando
+  const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
+  const descricaoDebounceRef = useRef(null);
 
   const [formData, setFormData] = useState({
     descricao: '',
@@ -15,6 +24,7 @@ export default function TransactionForm() {
     data: new Date().toISOString().split('T')[0],
     observacao: '',
     status: 'CONFIRMADA',
+    recorrencia: 'NENHUMA',
     idCategoria: '',
     idConta: '',
   });
@@ -24,8 +34,9 @@ export default function TransactionForm() {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState('');
+  const [sugestaoIA, setSugestaoIA] = useState(null);
+  const [loadingSugestao, setLoadingSugestao] = useState(false);
 
-  // Carregar categorias, contas e (se editando) a transação
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
@@ -37,7 +48,6 @@ export default function TransactionForm() {
         setCategorias(catRes.data);
         setContas(contaRes.data);
 
-        // Se estiver editando, carregar dados da transação
         if (isEditing) {
           const transRes = await api.get(`/transacoes/${id}`);
           const t = transRes.data;
@@ -48,8 +58,9 @@ export default function TransactionForm() {
             data: t.data || '',
             observacao: t.observacao || '',
             status: t.status || 'CONFIRMADA',
-            idCategoria: t.idCategoria || t.categoriaId || '',
-            idConta: t.idConta || t.contaId || '',
+            recorrencia: t.recorrencia || 'NENHUMA',
+            idCategoria: t.idCategoria || '',
+            idConta: t.idConta || '',
           });
         }
       } catch (err) {
@@ -62,15 +73,43 @@ export default function TransactionForm() {
     fetchData();
   }, [id, isEditing]);
 
+  const sugerirCategoria = useCallback(async (descricao) => {
+    if (!descricao || descricao.trim().length < 3) return;
+    setLoadingSugestao(true);
+    try {
+      const res = await api.post('/transacoes/classificar', { descricao });
+      setSugestaoIA(res.data);
+    } catch (err) {
+      // Falha silenciosa — sugestão é opcional
+      console.warn('Erro ao sugerir categoria:', err);
+    } finally {
+      setLoadingSugestao(false);
+    }
+  }, []);
+
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+
+    if (field === 'descricao') {
+      setSugestaoIA(null);
+      clearTimeout(descricaoDebounceRef.current);
+      descricaoDebounceRef.current = setTimeout(() => {
+        sugerirCategoria(value);
+      }, 500);
+    }
+  };
+
+  const handleAceitarSugestao = () => {
+    if (sugestaoIA?.idCategoria) {
+      setFormData((prev) => ({ ...prev, idCategoria: String(sugestaoIA.idCategoria) }));
+      setSugestaoIA(null);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Validações
     if (!formData.descricao.trim()) {
       setError('A descrição é obrigatória.');
       return;
@@ -97,8 +136,8 @@ export default function TransactionForm() {
     const payload = {
       ...formData,
       valor: Number(formData.valor),
-      idCategoria: formData.idCategoria ? Number(formData.idCategoria) : null,
-      idConta: formData.idConta ? Number(formData.idConta) : null,
+      idCategoria: Number(formData.idCategoria),
+      idConta: Number(formData.idConta),
     };
 
     try {
@@ -110,6 +149,7 @@ export default function TransactionForm() {
       navigate('/transacoes');
     } catch (err) {
       const msg =
+        err.response?.data?.mensagem ||
         err.response?.data?.message ||
         err.response?.data?.error ||
         'Erro ao salvar transação.';
@@ -129,7 +169,6 @@ export default function TransactionForm() {
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
-      {/* Voltar */}
       <button
         onClick={() => navigate('/transacoes')}
         className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors text-sm"
@@ -179,16 +218,47 @@ export default function TransactionForm() {
             </div>
           </div>
 
-          {/* Descrição */}
+          {/* Descrição + sugestão de categoria */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
-            <input
-              type="text"
-              value={formData.descricao}
-              onChange={(e) => handleChange('descricao', e.target.value)}
-              placeholder="Ex: Supermercado, Salário, Aluguel..."
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.descricao}
+                onChange={(e) => handleChange('descricao', e.target.value)}
+                placeholder="Ex: Supermercado, Salário, Aluguel..."
+                maxLength={100}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+              />
+              {loadingSugestao && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 size={16} className="animate-spin text-gray-400" />
+                </div>
+              )}
+            </div>
+            {/* Banner de sugestão de IA */}
+            {sugestaoIA && !loadingSugestao && (
+              <div className="mt-2 flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm">
+                <Sparkles size={14} className="text-purple-500 flex-shrink-0" />
+                <span className="text-purple-700 flex-1">
+                  Categoria sugerida: <strong>{sugestaoIA.nomeCategoria}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAceitarSugestao}
+                  className="text-xs bg-purple-600 text-white px-2 py-1 rounded font-medium hover:bg-purple-700 transition-colors"
+                >
+                  Usar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSugestaoIA(null)}
+                  className="text-purple-400 hover:text-purple-600"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Valor e Data */}
@@ -219,7 +289,7 @@ export default function TransactionForm() {
           {/* Categoria e Conta */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
               <select
                 value={formData.idCategoria}
                 onChange={(e) => handleChange('idCategoria', e.target.value)}
@@ -234,7 +304,7 @@ export default function TransactionForm() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Conta</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Conta *</label>
               <select
                 value={formData.idConta}
                 onChange={(e) => handleChange('idConta', e.target.value)}
@@ -244,6 +314,36 @@ export default function TransactionForm() {
                 {contas.map((conta) => (
                   <option key={conta.id} value={conta.id}>
                     {conta.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Status e Recorrência */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleChange('status', e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              >
+                <option value="CONFIRMADA">Confirmada</option>
+                <option value="PENDENTE">Pendente</option>
+                <option value="CANCELADA">Cancelada</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Recorrência</label>
+              <select
+                value={formData.recorrencia}
+                onChange={(e) => handleChange('recorrencia', e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+              >
+                {RECORRENCIA_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -260,6 +360,7 @@ export default function TransactionForm() {
               onChange={(e) => handleChange('observacao', e.target.value)}
               placeholder="Alguma anotação sobre esta transação..."
               rows={3}
+              maxLength={255}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
             />
           </div>
